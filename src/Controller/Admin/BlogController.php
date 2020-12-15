@@ -21,6 +21,7 @@ use Symfony\Component\Form\Extension\Core\Type\SubmitType;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use App\Util\CacheHelper;
 
 /**
  * Controller used to manage blog contents in the backend.
@@ -53,11 +54,16 @@ class BlogController extends AbstractController
      * @Route("/", methods="GET", name="admin_index")
      * @Route("/", methods="GET", name="admin_post_index")
      */
-    public function index(PostRepository $posts): Response
+    public function index(PostRepository $posts, CacheHelper $cacheHelper): Response
     {
+        $cachedPostsTitles = [];
+        $cachedPostsKeys = $cacheHelper->getAllKeys();
+        foreach($cachedPostsKeys as $postKey) {
+            $cachedPostsTitles[] = $cacheHelper->get($postKey);
+        }
         $authorPosts = $posts->findBy(['author' => $this->getUser()], ['publishedAt' => 'DESC']);
 
-        return $this->render('admin/blog/index.html.twig', ['posts' => $authorPosts]);
+        return $this->render('admin/blog/index.html.twig', ['posts' => $authorPosts, 'cachedPostsTitles' => $cachedPostsTitles]);
     }
 
     /**
@@ -69,7 +75,7 @@ class BlogController extends AbstractController
      * to constraint the HTTP methods each controller responds to (by default
      * it responds to all methods).
      */
-    public function new(Request $request): Response
+    public function new(Request $request, CacheHelper $cacheHelper): Response
     {
         $post = new Post();
         $post->setAuthor($this->getUser());
@@ -88,6 +94,8 @@ class BlogController extends AbstractController
             $em = $this->getDoctrine()->getManager();
             $em->persist($post);
             $em->flush();
+
+            $cacheHelper->set(['key' => 'post-'.$post->getId(), 'value' => $post->getTitle(), 'ttl' => null]);
 
             // Flash messages are used to notify the user about the result of the
             // actions. They are deleted automatically from the session as soon
@@ -155,11 +163,13 @@ class BlogController extends AbstractController
      * @Route("/{id}/delete", methods="POST", name="admin_post_delete")
      * @IsGranted("delete", subject="post")
      */
-    public function delete(Request $request, Post $post): Response
+    public function delete(Request $request, Post $post, CacheHelper $cacheHelper): Response
     {
         if (!$this->isCsrfTokenValid('delete', $request->request->get('token'))) {
             return $this->redirectToRoute('admin_post_index');
         }
+        
+        $cacheHelper->delete(['key' => 'post-'.$post->getId()]);
 
         // Delete the tags associated with this blog post. This is done automatically
         // by Doctrine, except for SQLite (the database used in this application)

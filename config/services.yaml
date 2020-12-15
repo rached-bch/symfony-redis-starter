@@ -8,6 +8,8 @@ parameters:
     # This parameter defines the codes of the locales (languages) enabled in the application
     app_locales: ar|en|fr|de|es|cs|nl|ru|uk|ro|pt_BR|pl|it|ja|id|ca|sl|hr|zh_CN|bg|tr|lt
     app.notifications.email_sender: anonymous@example.com
+    redis.host: 127.0.0.1
+    redis.port: 6379
 
 services:
     # default configuration for services in *this* file
@@ -39,3 +41,7 @@ services:
     # 'arguments' key and define the arguments just below the service class
     App\EventSubscriber\CommentNotificationSubscriber:
         $sender: '%app.notifications.email_sender%'
+
+    App\Util\RedisHelper:
+        $redisHost: '%redis.host%'
+        $redisPort: '%redis.port%'
